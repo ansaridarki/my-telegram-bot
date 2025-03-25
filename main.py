@@ -6,7 +6,7 @@ TOKEN = "7764863274:AAFuvcTiox1jkx84j-4MG86FbnGGFINmsx4"
 
 # وقتی کاربر دستور /start رو می‌زنن
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("سلام! من ربات تو هستم. هر چی بنویسی بهت برمی‌گردونم! 🤖")
+    await update.message.reply_text("سلام! من ربات تو هستم. هر چی بنویسی بهت برمی‌گردونم! یادت باشه که اول سلام کنی ممنون 🤖")
 
 # وقتی کاربر یه پیام به ربات بفرسته
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
