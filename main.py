@@ -2,136 +2,142 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboard
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 import os
 
-# 🧷 توکن رباتت رو اینجا وارد کن
+# 🔐 تنظیمات
 TOKEN = "7764863274:AAFuvcTiox1jkx84j-4MG86FbnGGFINmsx4"
+BOT_PASSWORD = "1899"  # رمز عبور دلخواه
 
 # 📁 مسیر ذخیره‌سازی فایل‌ها
 FILE_DIR = "my_files"
-if not os.path.exists(FILE_DIR):
-    os.makedirs(FILE_DIR)
+os.makedirs(FILE_DIR, exist_ok=True)
 
-# 📋 منوی اصلی ربات
-def main_menu_keyboard():
-    return ReplyKeyboardMarkup(
-        [
-            [KeyboardButton("📤 ارسال فایل")],
-            [KeyboardButton("📁 لیست فایل‌ها")],
-        ],
-        resize_keyboard=True
-    )
+# 🎛 کیبورد اصلی
+def main_menu():
+    return ReplyKeyboardMarkup([
+        [KeyboardButton("📤 ارسال فایل")],
+        [KeyboardButton("📁 لیست فایل‌ها")],
+    ], resize_keyboard=True)
 
-# 🎬 /start
+# ✅ /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
-    await update.message.reply_text(
-        "سلام! خوش اومدی به ربات مدیریت فایل شخصی 🗂️",
-        reply_markup=main_menu_keyboard()
-    )
+    context.user_data["auth"] = False
+    await update.message.reply_text("🔐 لطفاً رمز عبور را وارد کنید:")
 
-# ☑️ فعال‌سازی حالت دریافت فایل
-async def handle_upload_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# 🔐 بررسی رمز
+async def check_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("auth"):
+        return False
+
+    if update.message.text == BOT_PASSWORD:
+        context.user_data["auth"] = True
+        await update.message.reply_text("✅ ورود موفق! خوش اومدی 🤖", reply_markup=main_menu())
+    else:
+        await update.message.reply_text("❌ رمز اشتباهه! دوباره تلاش کن.")
+    return True
+
+# 📤 ارسال فایل - فعال کردن حالت آپلود
+async def handle_upload_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.user_data.get("auth"):
+        return
     context.user_data.clear()
     context.user_data["waiting_for_file"] = True
-    await update.message.reply_text("لطفاً فایل یا عکس مورد نظر رو بفرست 📎")
+    await update.message.reply_text("لطفاً فایل یا عکس مورد نظر را ارسال کن 📎")
 
-# 📥 دریافت فایل (Document)
+# 📥 دریافت فایل
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("waiting_for_file"):
-        await update.message.reply_text("⚠️ لطفاً اول گزینه «📤 ارسال فایل» رو انتخاب کن.")
         return
 
-    document = update.message.document
-    if not document:
-        await update.message.reply_text("❗ لطفاً فقط فایل یا عکس بفرست، نه متن.")
+    if update.message.document:
+        file_id = update.message.document.file_id
+        file_type = "document"
+    elif update.message.photo:
+        file_id = update.message.photo[-1].file_id
+        file_type = "photo"
+    else:
+        await update.message.reply_text("❗ فقط فایل یا عکس بفرست.")
         return
-
-    context.user_data["pending_file_id"] = document.file_id
-    context.user_data["is_photo"] = False
-    context.user_data["waiting_for_file"] = False
-    context.user_data["waiting_for_filename"] = True
-
-    await update.message.reply_text("📝 چه نامی برای ذخیره‌سازی فایل انتخاب می‌کنی؟")
-
-# 🖼️ دریافت عکس (Photo)
-async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get("waiting_for_file"):
-        await update.message.reply_text("⚠️ لطفاً اول گزینه «📤 ارسال فایل» رو انتخاب کن.")
-        return
-
-    photo = update.message.photo[-1]  # آخرین (بیشترین کیفیت)
-    file_id = photo.file_id
 
     context.user_data["pending_file_id"] = file_id
-    context.user_data["is_photo"] = True
-    context.user_data["waiting_for_file"] = False
+    context.user_data["file_type"] = file_type
     context.user_data["waiting_for_filename"] = True
+    context.user_data["waiting_for_file"] = False
 
-    await update.message.reply_text("📝 چه نامی برای ذخیره‌سازی این عکس می‌خوای؟")
+    await update.message.reply_text("📝 چه نامی برای این فایل انتخاب می‌کنی؟")
 
-# 💾 ذخیره فایل با نام دلخواه
+# 💾 ذخیره فایل
 async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("waiting_for_filename"):
         return
 
-    file_name = update.message.text.strip()
-
-    # ❌ جلوگیری از نام‌گذاری مثل دکمه‌ها
-    if file_name in ["📤 ارسال فایل", "📁 لیست فایل‌ها"]:
-        await update.message.reply_text("❌ این نام قابل استفاده نیست. لطفاً یک نام دیگه وارد کن.")
+    name = update.message.text.strip()
+    if name in ["📤 ارسال فایل", "📁 لیست فایل‌ها"]:
+        await update.message.reply_text("❗ این اسم قابل قبول نیست. یه چیز دیگه بده.")
         return
 
     file_id = context.user_data["pending_file_id"]
-    file_path = os.path.join(FILE_DIR, file_name)
+    file_type = context.user_data["file_type"]
+    file_path = os.path.join(FILE_DIR, name)
+    if file_type == "photo":
+        file_path += ".jpg"
 
-    try:
-        file = await context.bot.get_file(file_id)
-        if context.user_data.get("is_photo"):
-            file_path += ".jpg"
-        await file.download_to_drive(file_path)
-        await update.message.reply_text(f"✅ فایل با نام «{os.path.basename(file_path)}» ذخیره شد!", reply_markup=main_menu_keyboard())
-    except Exception as e:
-        await update.message.reply_text("❌ مشکلی در ذخیره‌سازی فایل پیش اومد.")
+    file = await context.bot.get_file(file_id)
+    await file.download_to_drive(file_path)
 
+    await update.message.reply_text(f"✅ فایل با نام «{os.path.basename(file_path)}» ذخیره شد.", reply_markup=main_menu())
     context.user_data.clear()
 
-# 📂 لیست فایل‌های ذخیره‌شده
+# 📁 لیست فایل‌ها
 async def list_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.clear()
-    files = os.listdir(FILE_DIR)
-
-    if not files:
-        await update.message.reply_text("📂 هنوز هیچ فایلی ذخیره نشده.")
+    if not context.user_data.get("auth"):
         return
 
-    keyboard = [[InlineKeyboardButton(f"📄 {file}", callback_data=file)] for file in files]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("📁 فایل‌های ذخیره‌شده:", reply_markup=reply_markup)
+    files = os.listdir(FILE_DIR)
+    if not files:
+        await update.message.reply_text("❗ هنوز فایلی ذخیره نشده.")
+        return
 
-# ⬇️ ارسال فایل انتخاب‌شده از لیست
-async def send_selected_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton(f"📄 {f}", callback_data=f"download|{f}"),
+         InlineKeyboardButton("🗑️", callback_data=f"delete|{f}")]
+        for f in files
+    ]
+    markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("📁 فایل‌های ذخیره شده:", reply_markup=markup)
+
+# ⬇️ دریافت یا حذف فایل
+async def handle_file_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    file_name = query.data
-    file_path = os.path.join(FILE_DIR, file_name)
 
-    if os.path.exists(file_path):
-        await query.message.reply_document(document=open(file_path, "rb"))
-    else:
-        await query.message.reply_text("❌ فایل پیدا نشد!")
+    action, filename = query.data.split("|")
+    file_path = os.path.join(FILE_DIR, filename)
 
-# 🚀 اجرای ربات
+    if action == "download":
+        if os.path.exists(file_path):
+            await query.message.reply_document(document=open(file_path, "rb"))
+        else:
+            await query.message.reply_text("❌ فایل وجود ندارد.")
+    elif action == "delete":
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            await query.message.reply_text(f"🗑️ فایل «{filename}» حذف شد.")
+        else:
+            await query.message.reply_text("❌ فایل پیدا نشد.")
+
+# 🧠 اجرای اصلی
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.Regex("^📤 ارسال فایل$"), handle_upload_mode))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_password))
+    app.add_handler(MessageHandler(filters.Regex("^📤 ارسال فایل$"), handle_upload_request))
     app.add_handler(MessageHandler(filters.Regex("^📁 لیست فایل‌ها$"), list_files))
-    app.add_handler(MessageHandler(filters.Document.ALL, handle_file))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, save_file))
-    app.add_handler(CallbackQueryHandler(send_selected_file))
+    app.add_handler(CallbackQueryHandler(handle_file_action))
 
-    print("✅ ربات در حال اجراست...")
+    print("✅ ربات راه‌اندازی شد.")
     app.run_polling()
 
 if __name__ == "__main__":
