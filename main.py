@@ -1,9 +1,10 @@
+# تمام قسمت‌های مربوط به OWNER_ID حذف شدن!
+
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 import os
 
 TOKEN = "7764863274:AAFuvcTiox1jkx84j-4MG86FbnGGFINmsx4"
-OWNER_ID = 6061883680  # آیدی عددی تلگرامت (فقط خودت به ربات دسترسی داری)
 
 FILE_DIR = "my_files"
 if not os.path.exists(FILE_DIR):
@@ -19,23 +20,15 @@ def main_menu_keyboard():
         resize_keyboard=True
     )
 
-# /start - فقط برای مالک ربات
+# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != OWNER_ID:
-        await update.message.reply_text("⛔ شما اجازه استفاده از این ربات را ندارید!")
-        return
-
     await update.message.reply_text(
         "سلام! 📂 ربات مدیریت فایل شخصی تو آماده‌ست.\nاز منوی زیر انتخاب کن:",
         reply_markup=main_menu_keyboard()
     )
 
-# دریافت و ذخیره فایل
+# دریافت فایل
 async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != OWNER_ID:
-        await update.message.reply_text("⛔ شما اجازه استفاده از این ربات را ندارید!")
-        return
-
     document = update.message.document
     if not document:
         await update.message.reply_text("❌ لطفاً فقط فایل بفرست، نه متن.")
@@ -47,7 +40,7 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("📌 چه نامی برای این فایل ذخیره کنم؟")
 
-# دریافت نام و ذخیره فایل
+# گرفتن اسم دلخواه
 async def get_file_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "pending_file_id" not in context.user_data:
         await update.message.reply_text("❌ لطفاً ابتدا یک فایل ارسال کن.")
@@ -58,19 +51,14 @@ async def get_file_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     file_path = os.path.join(FILE_DIR, file_name)
 
-    # دریافت فایل و ذخیره
     file = await context.bot.get_file(file_id)
     await file.download_to_drive(file_path)
 
     await update.message.reply_text(f"✅ فایل با نام «{file_name}» ذخیره شد!")
     del context.user_data["pending_file_id"]
 
-# نمایش لیست فایل‌ها
+# لیست فایل‌ها
 async def list_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != OWNER_ID:
-        await update.message.reply_text("⛔ شما اجازه استفاده از این ربات را ندارید!")
-        return
-
     files = os.listdir(FILE_DIR)
     if not files:
         await update.message.reply_text("📂 هنوز هیچ فایلی ذخیره نکردی.")
@@ -81,12 +69,12 @@ async def list_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("📁 لیست فایل‌های ذخیره‌شده:", reply_markup=reply_markup)
 
-# ارسال فایل انتخاب‌شده
+# دانلود فایل
 async def send_selected_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     file_name = query.data
-
     file_path = os.path.join(FILE_DIR, file_name)
+
     await query.message.reply_document(document=open(file_path, "rb"))
 
 # اجرای ربات
@@ -99,7 +87,7 @@ def main():
     app.add_handler(MessageHandler(filters.Regex("^📁 لیست فایل‌ها$"), list_files))
     app.add_handler(CallbackQueryHandler(send_selected_file))
 
-    print("📂 ربات مدیریت فایل شخصی آماده است!")
+    print("📦 ربات در حال اجراست...")
     app.run_polling()
 
 if __name__ == "__main__":
