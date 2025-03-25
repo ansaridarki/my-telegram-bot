@@ -41,7 +41,7 @@ async def handle_upload_request(update: Update, context: ContextTypes.DEFAULT_TY
         return
     context.user_data.clear()
     context.user_data["waiting_for_file"] = True
-    await update.message.reply_text("لطفاً فایل یا عکس مورد نظر را ارسال کن 📎")
+    await update.message.reply_text("در حال انتظار برای دریافت فایل... 📎")
 
 # 📥 دریافت فایل
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -77,7 +77,13 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     file_id = context.user_data["pending_file_id"]
     file_type = context.user_data["file_type"]
-    file_path = os.path.join(FILE_DIR, name)
+    
+    # ایجاد دایرکتوری خاص برای هر کاربر با استفاده از user_id
+    user_id = update.message.from_user.id
+    user_file_dir = os.path.join(FILE_DIR, str(user_id))
+    os.makedirs(user_file_dir, exist_ok=True)
+
+    file_path = os.path.join(user_file_dir, name)
     if file_type == "photo":
         file_path += ".jpg"
 
@@ -92,14 +98,20 @@ async def list_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("auth"):
         return
 
-    files = os.listdir(FILE_DIR)
+    # ایجاد دایرکتوری خاص برای هر کاربر با استفاده از user_id
+    user_id = update.message.from_user.id
+    user_file_dir = os.path.join(FILE_DIR, str(user_id))
+    
+    os.makedirs(user_file_dir, exist_ok=True)
+
+    files = os.listdir(user_file_dir)
     if not files:
         await update.message.reply_text("❗ هنوز فایلی ذخیره نشده.")
         return
 
     keyboard = [
         [InlineKeyboardButton(f"📄 {f}", callback_data=f"download|{f}"),
-         InlineKeyboardButton("🗑️", callback_data=f"delete|{f}")]
+         InlineKeyboardButton("🗑️ حذف", callback_data=f"delete|{f}")]
         for f in files
     ]
     markup = InlineKeyboardMarkup(keyboard)
@@ -111,7 +123,11 @@ async def handle_file_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
 
     action, filename = query.data.split("|")
-    file_path = os.path.join(FILE_DIR, filename)
+    
+    # ایجاد دایرکتوری خاص برای هر کاربر با استفاده از user_id
+    user_id = query.from_user.id
+    user_file_dir = os.path.join(FILE_DIR, str(user_id))
+    file_path = os.path.join(user_file_dir, filename)
 
     if action == "download":
         if os.path.exists(file_path):
