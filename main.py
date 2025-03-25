@@ -39,6 +39,8 @@ async def check_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_upload_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("auth"):
         return
+    
+    # برای اطمینان از اینکه پیام در اینجا ارسال می‌شود
     context.user_data.clear()
     context.user_data["waiting_for_file"] = True
     await update.message.reply_text("در حال انتظار برای دریافت فایل... 📎")
