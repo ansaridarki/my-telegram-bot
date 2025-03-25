@@ -3,7 +3,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 import os
 
 # 🔐 تنظیمات
-TOKEN = "7764863274:AAFuvcTiox1jkx84j-4MG86FbnGGFINmsx4"
+TOKEN = "7764863274:AAFuvcTiox1jkx84j-4MG86FbnGGFINmsx4"  # توکن ربات شما
 BOT_PASSWORD = "1899"  # رمز عبور دلخواه
 
 # 📁 مسیر ذخیره‌سازی فایل‌ها
@@ -15,6 +15,7 @@ def main_menu():
     return ReplyKeyboardMarkup([
         [KeyboardButton("📤 ارسال فایل")],
         [KeyboardButton("📁 لیست فایل‌ها")],
+        [KeyboardButton("🗑️ حذف فایل دلخواه")],
     ], resize_keyboard=True)
 
 # ✅ /start
@@ -73,8 +74,8 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     name = update.message.text.strip()
-    if name in ["📤 ارسال فایل", "📁 لیست فایل‌ها"]:
-        await update.message.reply_text("❗ این اسم قابل قبول نیست. یه چیز دیگه بده.")
+    if name in ["📤 ارسال فایل", "📁 لیست فایل‌ها", "🗑️ حذف فایل دلخواه"]:
+        await update.message.reply_text("❗ این اسم قابل قبول نیست. یه اسم دیگه بده.")
         return
 
     file_id = context.user_data["pending_file_id"]
@@ -151,6 +152,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_password))
     app.add_handler(MessageHandler(filters.Regex("^📤 ارسال فایل$"), handle_upload_request))
     app.add_handler(MessageHandler(filters.Regex("^📁 لیست فایل‌ها$"), list_files))
+    app.add_handler(MessageHandler(filters.Regex("^🗑️ حذف فایل دلخواه$"), handle_upload_request))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, save_file))
     app.add_handler(CallbackQueryHandler(handle_file_action))
