@@ -3,7 +3,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 import os
 
 TOKEN = "7764863274:AAFuvcTiox1jkx84j-4MG86FbnGGFINmsx4"
-OWNER_ID = 7764863274  # آیدی عددی تلگرامت (فقط خودت به ربات دسترسی داری)
+OWNER_ID = 6061883680  # آیدی عددی تلگرامت (فقط خودت به ربات دسترسی داری)
 
 FILE_DIR = "my_files"
 if not os.path.exists(FILE_DIR):
