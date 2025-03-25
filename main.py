@@ -1,112 +1,105 @@
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 import os
 
 TOKEN = "7764863274:AAFuvcTiox1jkx84j-4MG86FbnGGFINmsx4"
+OWNER_ID = 7764863274  # آیدی عددی تلگرامت (فقط خودت به ربات دسترسی داری)
 
-SONG_DIR = "songs"
+FILE_DIR = "my_files"
+if not os.path.exists(FILE_DIR):
+    os.makedirs(FILE_DIR)
 
-# ایجاد پوشه اگه وجود نداشت
-if not os.path.exists(SONG_DIR):
-    os.makedirs(SONG_DIR)
-
-# صفحه کلید اصلی
+# منوی اصلی
 def main_menu_keyboard():
     return ReplyKeyboardMarkup(
         [
-            [KeyboardButton("🎵 ارسال آهنگ")],
-            [KeyboardButton("⬇️ دانلود آهنگ"), KeyboardButton("🎼 لیست آهنگ‌هام")],
-            [KeyboardButton("🗑 حذف آهنگ")]
+            [KeyboardButton("📤 ارسال فایل")],
+            [KeyboardButton("📁 لیست فایل‌ها")],
         ],
         resize_keyboard=True
     )
 
-# /start
+# /start - فقط برای مالک ربات
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id != OWNER_ID:
+        await update.message.reply_text("⛔ شما اجازه استفاده از این ربات را ندارید!")
+        return
+
     await update.message.reply_text(
-        "سلام! 🎶 لطفاً یکی از گزینه‌های زیر رو انتخاب کن:",
+        "سلام! 📂 ربات مدیریت فایل شخصی تو آماده‌ست.\nاز منوی زیر انتخاب کن:",
         reply_markup=main_menu_keyboard()
     )
 
-# هندلر دکمه‌ها
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    if text == "⬇️ دانلود آهنگ":
-        await update.message.reply_text("اسم آهنگی که می‌خوای دانلود کنی رو بفرست 🎼")
-    elif text == "🎵 ارسال آهنگ":
-        await update.message.reply_text("لطفاً آهنگ مورد نظرت رو ارسال کن تا ذخیره کنم 🎧")
-    elif text == "🗑 حذف آهنگ":
-        await update.message.reply_text("اسم آهنگی که می‌خوای حذف کنی رو بفرست ❌")
-    elif text == "🎼 لیست آهنگ‌هام":
-        await list_songs(update)
-    else:
-        await update.message.reply_text("لطفاً از دکمه‌های موجود استفاده کن.")
-
-# ذخیره آهنگ با نام اختصاصی
-async def save_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    audio = update.message.audio or update.message.voice or update.message.document
-
-    if not audio:
-        await update.message.reply_text("فقط فایل صوتی بفرست لطفاً 🎧")
+# دریافت و ذخیره فایل
+async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id != OWNER_ID:
+        await update.message.reply_text("⛔ شما اجازه استفاده از این ربات را ندارید!")
         return
 
-    file = await context.bot.get_file(audio.file_id)
-    
-    file_name = audio.file_name if hasattr(audio, "file_name") else f"song_{audio.file_id}.mp3"
-    file_path = os.path.join(SONG_DIR, f"{user_id}_{file_name}")
+    document = update.message.document
+    if not document:
+        await update.message.reply_text("❌ لطفاً فقط فایل بفرست، نه متن.")
+        return
 
+    # ذخیره file_id موقت تا بعداً نام بگیریم
+    context.user_data["pending_file_id"] = document.file_id
+    context.user_data["pending_file_name"] = document.file_name
+
+    await update.message.reply_text("📌 چه نامی برای این فایل ذخیره کنم؟")
+
+# دریافت نام و ذخیره فایل
+async def get_file_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if "pending_file_id" not in context.user_data:
+        await update.message.reply_text("❌ لطفاً ابتدا یک فایل ارسال کن.")
+        return
+
+    file_name = update.message.text.strip()
+    file_id = context.user_data["pending_file_id"]
+
+    file_path = os.path.join(FILE_DIR, file_name)
+
+    # دریافت فایل و ذخیره
+    file = await context.bot.get_file(file_id)
     await file.download_to_drive(file_path)
 
-    await update.message.reply_text(f"✅ آهنگ {file_name} ذخیره شد!")
+    await update.message.reply_text(f"✅ فایل با نام «{file_name}» ذخیره شد!")
+    del context.user_data["pending_file_id"]
 
-# لیست آهنگ‌های کاربر
-async def list_songs(update: Update):
-    user_id = update.message.from_user.id
-    user_files = [f.split("_", 1)[1] for f in os.listdir(SONG_DIR) if f.startswith(str(user_id))]
+# نمایش لیست فایل‌ها
+async def list_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id != OWNER_ID:
+        await update.message.reply_text("⛔ شما اجازه استفاده از این ربات را ندارید!")
+        return
 
-    if user_files:
-        song_list = "\n".join(user_files)
-        await update.message.reply_text(f"🎼 آهنگ‌های شما:\n{song_list}\n\nبرای دانلود یا حذف، اسم آهنگ رو بفرست.")
-    else:
-        await update.message.reply_text("❌ شما هنوز هیچ آهنگی ذخیره نکردی.")
+    files = os.listdir(FILE_DIR)
+    if not files:
+        await update.message.reply_text("📂 هنوز هیچ فایلی ذخیره نکردی.")
+        return
 
-# دانلود آهنگ
-async def download_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    song_name = update.message.text.strip()
+    keyboard = [[InlineKeyboardButton(f"📄 {file}", callback_data=file)] for file in files]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-    file_path = os.path.join(SONG_DIR, f"{user_id}_{song_name}")
+    await update.message.reply_text("📁 لیست فایل‌های ذخیره‌شده:", reply_markup=reply_markup)
 
-    if os.path.exists(file_path):
-        await update.message.reply_audio(audio=open(file_path, "rb"))
-    else:
-        await update.message.reply_text("❌ چنین آهنگی پیدا نشد. لطفاً اسم درست رو بفرست.")
+# ارسال فایل انتخاب‌شده
+async def send_selected_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    file_name = query.data
 
-# حذف آهنگ
-async def delete_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    song_name = update.message.text.strip()
-
-    file_path = os.path.join(SONG_DIR, f"{user_id}_{song_name}")
-
-    if os.path.exists(file_path):
-        os.remove(file_path)
-        await update.message.reply_text(f"🗑 آهنگ {song_name} حذف شد!")
-    else:
-        await update.message.reply_text("❌ چنین آهنگی پیدا نشد.")
+    file_path = os.path.join(FILE_DIR, file_name)
+    await query.message.reply_document(document=open(file_path, "rb"))
 
 # اجرای ربات
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-    app.add_handler(MessageHandler(filters.AUDIO | filters.VOICE | filters.Document.AUDIO, save_song))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^\w+\.\w+$"), download_song))  # تشخیص دانلود
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^\w+\.\w+$"), delete_song))  # تشخیص حذف
+    app.add_handler(MessageHandler(filters.Document.ALL, save_file))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, get_file_name))
+    app.add_handler(MessageHandler(filters.Regex("^📁 لیست فایل‌ها$"), list_files))
+    app.add_handler(CallbackQueryHandler(send_selected_file))
 
-    print("🎧 ربات با مدیریت آهنگ‌ها آماده‌ست!")
+    print("📂 ربات مدیریت فایل شخصی آماده است!")
     app.run_polling()
 
 if __name__ == "__main__":
