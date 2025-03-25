@@ -1,10 +1,53 @@
+^ برای حل مشکل عدم ارسال فایل‌ها در گزینه "لیست فایل‌ها"، باید اطمینان حاصل کنیم که کد مربوط به لیست کردن فایل‌ها به درستی کار می‌کند و فایل‌ها را به درستی به کاربر نمایش می‌دهد. بیایید کد مربوط به لیست کردن فایل‌ها را بررسی و اصلاح کنیم.
+
+### کد اصلاح شده برای لیست کردن فایل‌ها
+
+```python
+async def list_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.user_data.get("auth"):
+        await update.message.reply_text("❌ شما مجاز به مشاهده این بخش نیستید.")
+        return
+
+    files = os.listdir(FILE_DIR)
+    if not files:
+        await update.message.reply_text("📂 هنوز فایلی ذخیره نشده.")
+        return
+
+    keyboard = []
+    for f in files:
+        keyboard.append([
+            InlineKeyboardButton(f"📄 {f}", callback_data=f"download|{f}"),
+            InlineKeyboardButton("🗑 حذف", callback_data=f"delete|{f}")
+        ])
+
+    markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("📁 لیست فایل‌ها:", reply_markup=markup)
+```
+
+### نکات مهم:
+1. **بررسی مجوز کاربر**: در ابتدا، بررسی می‌شود که آیا کاربر احراز هویت شده است یا خیر. اگر کاربر احراز هویت نشده باشد، پیامی مبنی بر عدم دسترسی ارسال می‌شود.
+  
+2. **لیست فایل‌ها**: با استفاده از `os.listdir(FILE_DIR)`، لیست فایل‌ها در دایرکتوری مشخص شده دریافت می‌شود. اگر هیچ فایلی وجود نداشته باشد، پیامی به کاربر ارسال می‌شود.
+
+3. **ایجاد دکمه‌ها**: برای هر فایل، دو دکمه ایجاد می‌شود: یکی برای دانلود و دیگری برای حذف. این دکمه‌ها به کاربر اجازه می‌دهند تا فایل‌ها را مدیریت کند.
+
+4. **ارسال پیام**: در نهایت، لیست فایل‌ها به همراه دکمه‌ها به کاربر ارسال می‌شود.
+
+### اطمینان از کارکرد صحیح
+- اطمینان حاصل کنید که دایرکتوری `files` وجود دارد و فایل‌هایی در آن ذخیره شده‌اند.
+- همچنین، مطمئن شوید که توکن ربات و رمز عبور به درستی تنظیم شده‌اند و کاربر به درستی احراز هویت شده است.
+
+### کد کامل
+در اینجا کد کامل ربات با اصلاحات مربوط به لیست کردن فایل‌ها آورده شده است:
+
+```python
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 import os
 
 # تنظیمات اصلی
-TOKEN = "7764863274:AAFuvcTiox1jkx84j-4MG86FbnGGFINmsx4"
-PASSWORD = "12345"       # 🔐 رمز ورود مخصوص خودت
+TOKEN = "توکن_ربات_تو"  # توکن رباتت رو اینجا بذار
+PASSWORD = "12345"  # رمز ورود مخصوص خودت
 FILE_DIR = "files"
 os.makedirs(FILE_DIR, exist_ok=True)
 
@@ -45,92 +88,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     file = update.message.document or (update.message.photo[-1] if update.message.photo else None)
     if not file:
-        await update.message.reply_text("❗ فقط فایل یا عکس بفرست.")
+        await update.message.reply_text("❗️ فقط فایل یا عکس بفرست.")
         return
     file_id = file.file_id
     file_type = "photo" if update.message.photo else "document"
-
-    context.user_data["pending_file_id"] = file_id
-    context.user_data["file_type"] = file_type
-    context.user_data["waiting_for_filename"] = True
-    context.user_data["waiting_for_file"] = False
-
-    await update.message.reply_text("📝 لطفاً یک نام دلخواه برای فایل وارد کن:")
-
-# ذخیره فایل
-async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get("waiting_for_filename"):
-        return
-    name = update.message.text.strip()
-    if not name:
-        await update.message.reply_text("❗ لطفاً نام درستی وارد کن.")
-        return
-
-    file_id = context.user_data["pending_file_id"]
-    file_type = context.user_data["file_type"]
-    file_path = os.path.join(FILE_DIR, name)
-    if file_type == "photo":
-        file_path += ".jpg"
-
-    telegram_file = await context.bot.get_file(file_id)
-    await telegram_file.download_to_drive(file_path)
-
-    await update.message.reply_text(f"✅ فایل با نام «{os.path.basename(file_path)}» ذخیره شد.", reply_markup=main_menu())
-    context.user_data.clear()
-
-# لیست فایل‌ها
-async def list_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get("auth"):
-        return
-    files = os.listdir(FILE_DIR)
-    if not files:
-        await update.message.reply_text("📂 هنوز فایلی ذخیره نشده.")
-        return
-
-    keyboard = []
-    for f in files:
-        keyboard.append([
-            InlineKeyboardButton(f"📄 {f}", callback_data=f"download|{f}"),
-            InlineKeyboardButton("🗑️ حذف", callback_data=f"delete|{f}")
-        ])
-
-    markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("📁 لیست فایل‌ها:", reply_markup=markup)
-
-# مدیریت دانلود یا حذف
-async def handle_file_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    action, filename = query.data.split("|", 1)
-    filepath = os.path.join(FILE_DIR, filename)
-
-    if action == "download":
-        if os.path.exists(filepath):
-            await query.message.reply_document(document=open(filepath, "rb"))
-        else:
-            await query.message.reply_text("❌ فایل پیدا نشد.")
-    elif action == "delete":
-        if os.path.exists(filepath):
-            os.remove(filepath)
-            await query.message.reply_text(f"🗑️ فایل «{filename}» حذف شد.")
-        else:
-            await query.message.reply_text("❌ فایل پیدا نشد.")
-
-# اجرای برنامه
-def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_password))
-    app.add_handler(MessageHandler(filters.Regex("^📤 ارسال فایل$"), upload_request))
-    app.add_handler(MessageHandler(filters.Regex("^📁 لیست فایل‌ها$"), list_files))
-    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_file))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, save_file))
-    app.add_handler(CallbackQueryHandler(handle_file_action))
-
-    print("🤖 ربات آماده‌ست...")
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
