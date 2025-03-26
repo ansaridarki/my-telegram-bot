@@ -23,6 +23,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 🧠 بررسی رمز
 async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # بررسی اینکه آیا کاربر منتظر رمز است یا نه
     if context.user_data.get("waiting_for_filename"):
         return
 
@@ -129,7 +130,7 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
 
-    # ترتیب مهمه!
+    # ترتیب مهمه! هندلرها باید در این ترتیب باشن
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_file))       # فایل
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, save_file))              # نام فایل
     app.add_handler(MessageHandler(filters.Regex("^📤 ارسال فایل$"), upload_request))        # دکمه ارسال
