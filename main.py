@@ -4,7 +4,7 @@ import os
 
 # تنظیمات اصلی
 TOKEN = "7764863274:AAFuvcTiox1jkx84j-4MG86FbnGGFINmsx4"
-PASSWORD = "1"       # 🔐 رمز ورود مخصوص خودت
+PASSWORD = "1"       # 🔐 رمز ورود
 FILE_DIR = "files"
 os.makedirs(FILE_DIR, exist_ok=True)
 
@@ -36,8 +36,9 @@ async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def upload_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("auth"):
         return
+    context.user_data.clear()
     context.user_data["waiting_for_file"] = True
-    await update.message.reply_text("📎 لطفاً فایل یا عکس مورد نظر را ارسال کن.")
+    await update.message.reply_text("📡 در حال انتظار برای ارسال فایل...\nلطفاً فایل یا عکس خود را ارسال کنید.")
 
 # دریافت فایل
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
