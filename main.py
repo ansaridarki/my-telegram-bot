@@ -4,7 +4,7 @@ import os
 
 # 🔐 تنظیمات اصلی
 TOKEN = "7764863274:AAFuvcTiox1jkx84j-4MG86FbnGGFINmsx4"
-PASSWORD = "12345"       # رمز ورود
+PASSWORD = "12345"       # 👈 رمز ورود خودت
 FILE_DIR = "files"
 os.makedirs(FILE_DIR, exist_ok=True)
 
@@ -23,15 +23,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 🧠 بررسی رمز عبور
 async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("waiting_for_filename"):
+        return  # کاربر در حال وارد کردن اسم فایل هست، نه رمز
+
     if context.user_data.get("auth"):
         return
+
     if update.message.text == PASSWORD:
         context.user_data["auth"] = True
         await update.message.reply_text("✅ ورود موفق! خوش اومدی ✌️", reply_markup=main_menu())
     else:
         await update.message.reply_text("❌ رمز اشتباهه! لطفاً دوباره تلاش کن.")
 
-# 📤 درخواستی برای ارسال فایل
+# 📤 درخواست برای ارسال فایل
 async def upload_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("auth"):
         return
@@ -97,7 +101,7 @@ async def list_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
     markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("📁 لیست فایل‌ها:", reply_markup=markup)
 
-# 📥 دانلود یا 🗑️ حذف
+# 📥 دانلود / 🗑️ حذف فایل
 async def handle_file_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
