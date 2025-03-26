@@ -17,8 +17,8 @@ def main_menu():
 
 # 🚪 استارت
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.clear()
-    context.user_data["auth"] = False
+    context.user_data.clear()  # پاک کردن داده‌های کاربر برای شروع دوباره
+    context.user_data["auth"] = False  # اعتبارسنجی شروع می‌شود
     await update.message.reply_text("🔐 لطفاً رمز عبور را وارد کنید:")
 
 # 🧠 بررسی رمز
@@ -33,6 +33,7 @@ async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ➕ درخواست ارسال فایل
 async def upload_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("auth"):
+        await update.message.reply_text("❌ ابتدا باید وارد شوید. لطفاً رمز را وارد کنید.")
         return
     context.user_data.clear()
     context.user_data["waiting_for_file"] = True
@@ -81,6 +82,7 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 📁 لیست فایل‌ها
 async def list_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("auth"):
+        await update.message.reply_text("❌ ابتدا باید وارد شوید. لطفاً رمز را وارد کنید.")
         return
 
     files = os.listdir(FILE_DIR)
