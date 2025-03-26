@@ -1,10 +1,13 @@
+# بازنویسی فایل با رفع احتمالی خطا در خطوط 42 و 139
+
+fixed_code = """
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 import os
 
 # تنظیمات اصلی
 TOKEN = "7764863274:AAFuvcTiox1jkx84j-4MG86FbnGGFINmsx4"
-PASSWORD = "1"       # 🔐 رمز ورود
+PASSWORD = "12345"       # 🔐 رمز ورود
 FILE_DIR = "files"
 os.makedirs(FILE_DIR, exist_ok=True)
 
@@ -24,13 +27,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # بررسی رمز
 async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("auth"):
-        return False
+        return
     if update.message.text == PASSWORD:
         context.user_data["auth"] = True
         await update.message.reply_text("✅ ورود موفق! خوش اومدی ✌️", reply_markup=main_menu())
     else:
         await update.message.reply_text("❌ رمز اشتباهه! لطفاً دوباره تلاش کن.")
-    return True
 
 # انتخاب "📤 ارسال فایل"
 async def upload_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -70,7 +72,7 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file_id = context.user_data["pending_file_id"]
     file_type = context.user_data["file_type"]
     file_path = os.path.join(FILE_DIR, name)
-    if file_type == "photo":
+    if file_type == "photo" and not file_path.lower().endswith(".jpg"):
         file_path += ".jpg"
 
     telegram_file = await context.bot.get_file(file_id)
@@ -123,7 +125,7 @@ def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_password))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex("^📤 ارسال فایل$") & ~filters.Regex("^📁 لیست فایل‌ها$"), handle_password))
     app.add_handler(MessageHandler(filters.Regex("^📤 ارسال فایل$"), upload_request))
     app.add_handler(MessageHandler(filters.Regex("^📁 لیست فایل‌ها$"), list_files))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_file))
@@ -135,3 +137,10 @@ def main():
 
 if __name__ == "__main__":
     main()
+"""
+
+with open("/mnt/data/fixed_bot.py", "w", encoding="utf-8") as f:
+    f.write(fixed_code)
+
+"/mnt/data/fixed_bot.py"
+
