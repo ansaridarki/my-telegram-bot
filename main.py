@@ -1,30 +1,27 @@
-# بازنویسی فایل با رفع احتمالی خطا در خطوط 42 و 139
-
-fixed_code = """
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 import os
 
-# تنظیمات اصلی
+# 🔐 تنظیمات اصلی
 TOKEN = "7764863274:AAFuvcTiox1jkx84j-4MG86FbnGGFINmsx4"
-PASSWORD = "12345"       # 🔐 رمز ورود
+PASSWORD = "12345"       # رمز ورود
 FILE_DIR = "files"
 os.makedirs(FILE_DIR, exist_ok=True)
 
-# ساخت منوی اصلی
+# 📋 منوی اصلی
 def main_menu():
     return ReplyKeyboardMarkup([
         [KeyboardButton("📤 ارسال فایل")],
         [KeyboardButton("📁 لیست فایل‌ها")]
     ], resize_keyboard=True)
 
-# /start
+# 🚪 /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     context.user_data["auth"] = False
     await update.message.reply_text("🔐 لطفاً رمز عبور را وارد کنید:")
 
-# بررسی رمز
+# 🧠 بررسی رمز عبور
 async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("auth"):
         return
@@ -34,7 +31,7 @@ async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ رمز اشتباهه! لطفاً دوباره تلاش کن.")
 
-# انتخاب "📤 ارسال فایل"
+# 📤 درخواستی برای ارسال فایل
 async def upload_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("auth"):
         return
@@ -42,7 +39,7 @@ async def upload_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["waiting_for_file"] = True
     await update.message.reply_text("📡 در حال انتظار برای ارسال فایل...\nلطفاً فایل یا عکس خود را ارسال کنید.")
 
-# دریافت فایل
+# 📎 دریافت فایل
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("waiting_for_file"):
         return
@@ -60,7 +57,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("📝 لطفاً یک نام دلخواه برای فایل وارد کن:")
 
-# ذخیره فایل
+# 💾 ذخیره فایل
 async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("waiting_for_filename"):
         return
@@ -81,7 +78,7 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ فایل با نام «{os.path.basename(file_path)}» ذخیره شد.", reply_markup=main_menu())
     context.user_data.clear()
 
-# لیست فایل‌ها
+# 📁 لیست فایل‌ها
 async def list_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("auth"):
         return
@@ -100,7 +97,7 @@ async def list_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
     markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("📁 لیست فایل‌ها:", reply_markup=markup)
 
-# مدیریت دانلود یا حذف
+# 📥 دانلود یا 🗑️ حذف
 async def handle_file_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -120,7 +117,7 @@ async def handle_file_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
         else:
             await query.message.reply_text("❌ فایل پیدا نشد.")
 
-# اجرای برنامه
+# ▶️ اجرای ربات
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -137,10 +134,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-"""
-
-with open("/mnt/data/fixed_bot.py", "w", encoding="utf-8") as f:
-    f.write(fixed_code)
-
-"/mnt/data/fixed_bot.py"
-
