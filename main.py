@@ -1,167 +1,114 @@
-import os
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 import sqlite3
-from telegram import (
-    Update, ReplyKeyboardMarkup, KeyboardButton,
-    InlineKeyboardMarkup, InlineKeyboardButton
-)
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    ContextTypes, filters, CallbackQueryHandler
-)
+import os
 
-TOKEN = "7764863274:AAFuvcTiox1jkx84j-4MG86FbnGGFINmsx4"
+# --- تنظیمات ---
+BOT_TOKEN = "7764863274:AAFuvcTiox1jkx84j-4MG86FbnGGFINmsx4"
 
-DB_PATH = "files.db"
+# --- دیتابیس ---
+conn = sqlite3.connect("files.db")
+cursor = conn.cursor()
+cursor.execute("CREATE TABLE IF NOT EXISTS files (name TEXT, file_id TEXT)")
+conn.commit()
 
-# ایجاد دیتابیس و جدول
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS files (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            file_id TEXT,
-            file_type TEXT,
-            date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-# ذخیره اطلاعات فایل در دیتابیس
-def save_file_to_db(name, file_id, file_type):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('INSERT INTO files (name, file_id, file_type) VALUES (?, ?, ?)', (name, file_id, file_type))
-    conn.commit()
-    conn.close()
-
-# گرفتن لیست فایل‌ها
-def get_files():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('SELECT id, name FROM files')
-    files = c.fetchall()
-    conn.close()
-    return files
-
-# گرفتن یک فایل خاص با آیدی
-def get_file_by_id(file_id):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('SELECT name, file_id, file_type FROM files WHERE id = ?', (file_id,))
-    result = c.fetchone()
-    conn.close()
-    return result
-
-# حذف فایل
-def delete_file(file_id):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('DELETE FROM files WHERE id = ?', (file_id,))
-    conn.commit()
-    conn.close()
-
-# منوی اصلی
-def main_menu():
-    return ReplyKeyboardMarkup([
-        [KeyboardButton("📤 ارسال فایل")],
+# --- کیبورد اصلی ---
+main_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton("📤 ارسال فایل"), KeyboardButton("🗑 حذف فایل")],
         [KeyboardButton("📁 لیست فایل‌ها")]
-    ], resize_keyboard=True)
+    ],
+    resize_keyboard=True
+)
 
-# استارت
+# --- /start ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("سلام! خوش اومدی 🙌", reply_markup=main_menu())
+    await update.message.reply_text("سلام! خوش اومدی 😊 یکی از گزینه‌های زیر رو انتخاب کن:", reply_markup=main_keyboard)
 
-# ارسال فایل
-async def prompt_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.clear()
-    context.user_data["waiting_for_file"] = True
-    await update.message.reply_text("لطفاً فایل مورد نظر رو بفرست...")
+# --- هندل ارسال فایل ---
+user_states = {}
 
-# دریافت فایل
-async def receive_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get("waiting_for_file"):
-        return
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
 
-    file = update.message.document or (update.message.photo[-1] if update.message.photo else None)
+    if text == "📤 ارسال فایل":
+        user_states[update.effective_user.id] = "waiting_for_file"
+        await update.message.reply_text("منتظرم فایلت رو بفرستی...")
+
+    elif text == "📁 لیست فایل‌ها":
+        cursor.execute("SELECT name FROM files")
+        rows = cursor.fetchall()
+        if not rows:
+            await update.message.reply_text("📂 هیچ فایلی وجود نداره!")
+        else:
+            msg = "📁 لیست فایل‌ها:\n\n" + "\n".join(f"• {r[0]}" for r in rows)
+            await update.message.reply_text(msg)
+
+    elif text == "🗑 حذف فایل":
+        cursor.execute("SELECT name FROM files")
+        rows = cursor.fetchall()
+        if not rows:
+            await update.message.reply_text("هیچ فایلی برای حذف وجود نداره ❌")
+        else:
+            keyboard = [
+                [InlineKeyboardButton(text=row[0], callback_data=f"delete:{row[0]}")]
+                for row in rows
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text("کدوم فایل رو میخوای حذف کنی؟", reply_markup=reply_markup)
+
+    elif user_states.get(update.effective_user.id) == "waiting_for_filename":
+        context.user_data["filename"] = text
+        await update.message.reply_text("نام ثبت شد. حالا فایلت رو بفرست.")
+        user_states[update.effective_user.id] = "waiting_for_file_upload"
+
+async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    state = user_states.get(user_id)
+
+    file = update.message.document or update.message.video or update.message.audio or update.message.photo[-1] if update.message.photo else None
+
     if not file:
-        await update.message.reply_text("❗ لطفاً فقط فایل یا عکس ارسال کن.")
+        await update.message.reply_text("❌ لطفاً یک فایل معتبر ارسال کن.")
         return
 
-    context.user_data["file_id"] = file.file_id
-    context.user_data["file_type"] = "photo" if update.message.photo else "document"
-    context.user_data["waiting_for_name"] = True
-    context.user_data["waiting_for_file"] = False
+    if state == "waiting_for_file":
+        await update.message.reply_text("اسم دلخواهت برای فایل چیه؟")
+        user_states[user_id] = "waiting_for_filename"
 
-    await update.message.reply_text("📝 حالا یک نام دلخواه برای فایل وارد کن:")
+    elif state == "waiting_for_file_upload":
+        file_id = file.file_id
+        name = context.user_data.get("filename", "بدون‌نام")
 
-# دریافت اسم فایل
-async def receive_file_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get("waiting_for_name"):
-        return
+        cursor.execute("INSERT INTO files (name, file_id) VALUES (?, ?)", (name, file_id))
+        conn.commit()
 
-    name = update.message.text.strip()
-    file_id = context.user_data["file_id"]
-    file_type = context.user_data["file_type"]
+        await update.message.reply_text(f"✅ فایل «{name}» ذخیره شد!")
+        user_states[user_id] = None
 
-    save_file_to_db(name, file_id, file_type)
-
-    await update.message.reply_text(f"✅ فایل «{name}» ذخیره شد!", reply_markup=main_menu())
-    context.user_data.clear()
-
-# لیست فایل‌ها
-async def list_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    files = get_files()
-    if not files:
-        await update.message.reply_text("📂 فایلی ذخیره نشده.")
-        return
-
-    keyboard = []
-    for file in files:
-        keyboard.append([
-            InlineKeyboardButton(f"📄 {file[1]}", callback_data=f"download|{file[0]}"),
-            InlineKeyboardButton("🗑 حذف", callback_data=f"delete|{file[0]}")
-        ])
-    markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("📁 لیست فایل‌ها:", reply_markup=markup)
-
-# هندل دکمه‌ها
-async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# --- حذف فایل ---
+async def delete_file_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    action, file_id = query.data.split("|")
-    file_data = get_file_by_id(file_id)
 
-    if not file_data:
-        await query.message.reply_text("❌ فایل پیدا نشد.")
-        return
+    if query.data.startswith("delete:"):
+        file_name = query.data.split(":", 1)[1]
 
-    name, file_id, file_type = file_data
+        cursor.execute("DELETE FROM files WHERE name = ?", (file_name,))
+        conn.commit()
 
-    if action == "download":
-        if file_type == "photo":
-            await query.message.reply_photo(file_id, caption=f"📷 {name}")
-        else:
-            await query.message.reply_document(file_id, caption=f"📄 {name}")
-    elif action == "delete":
-        delete_file(file_id=int(file_id))
-        await query.message.reply_text(f"🗑 فایل «{name}» حذف شد.")
+        await query.edit_message_text(f"✅ فایل «{file_name}» حذف شد!")
 
-# اجرای ربات
+# --- راه‌اندازی ---
 def main():
-    init_db()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.Regex("^📤 ارسال فایل$"), prompt_file))
-    app.add_handler(MessageHandler(filters.Regex("^📁 لیست فایل‌ها$"), list_files))
-    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, receive_file))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, receive_file_name))
-    app.add_handler(CallbackQueryHandler(handle_callbacks))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(MessageHandler(filters.Document.ALL | filters.Video.ALL | filters.Audio.ALL | filters.PHOTO, handle_file))
+    app.add_handler(CallbackQueryHandler(delete_file_callback))
 
-    print("✅ ربات در حال اجراست...")
+    print("🤖 ربات آماده است...")
     app.run_polling()
 
 if __name__ == "__main__":
