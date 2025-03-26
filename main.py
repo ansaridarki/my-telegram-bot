@@ -23,13 +23,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 🧠 بررسی رمز
 async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # بررسی اینکه آیا کاربر منتظر رمز است یا نه
-    if context.user_data.get("waiting_for_filename"):
-        return
-
-    if context.user_data.get("auth"):
-        return
-
+    # اگر رمز وارد شده صحیح بود
     if update.message.text == PASSWORD:
         context.user_data["auth"] = True
         await update.message.reply_text("✅ ورود موفق! خوش اومدی ✌️", reply_markup=main_menu())
@@ -128,14 +122,15 @@ async def handle_file_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
+    # هندلر بررسی رمز باید قبل از سایر هندلرها بیاد
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_password))  # رمز عبور
 
-    # ترتیب مهمه! هندلرها باید در این ترتیب باشن
+    # هندلرهای بعدی
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_file))       # فایل
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, save_file))              # نام فایل
     app.add_handler(MessageHandler(filters.Regex("^📤 ارسال فایل$"), upload_request))        # دکمه ارسال
     app.add_handler(MessageHandler(filters.Regex("^📁 لیست فایل‌ها$"), list_files))          # دکمه لیست
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_password))        # رمز
     app.add_handler(CallbackQueryHandler(handle_file_action))                                # دکمه‌های لیست
 
     print("🤖 ربات روشنه... برو تو تلگرام تستش کن.")
